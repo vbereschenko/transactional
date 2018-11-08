@@ -17,6 +17,7 @@ type chainExecutable struct {
 	steps []step
 }
 
+// Execute default chain
 func (t chainExecutable) Execute(input ...interface{}) error {
 	inputValues := make([]reflect.Value, len(input))
 	for i, inputValue := range input {

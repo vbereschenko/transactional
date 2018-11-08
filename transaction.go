@@ -10,6 +10,7 @@ type Transaction struct {
 	steps []step
 }
 
+// Creates a step that provides data to next step
 func (t *Transaction) Step(name string, fn interface{}) *Transaction {
 	step := basicStep{name: name, fn: fn}
 	step.hasError, step.errorPosition = errorPosition(fn)
@@ -19,6 +20,8 @@ func (t *Transaction) Step(name string, fn interface{}) *Transaction {
 	return t
 }
 
+// Creates step that in case of error in current or any next step will execute callback
+// could be used to restore application state in case of error
 func (t *Transaction) FallbackStep(name string, fn, fallback interface{}) *Transaction {
 	step := fallbackStep{
 		basicStep: basicStep{name: name, fn: fn},
@@ -31,6 +34,8 @@ func (t *Transaction) FallbackStep(name string, fn, fallback interface{}) *Trans
 	return t
 }
 
+// Creates a step that will be executing `repeat` number of times with interval `interval`
+// until no error returned from step
 func (t *Transaction) RepeatingStep(name string, fn interface{}, repeat int, interval time.Duration) {
 	step := repeatingStep{
 		basicStep: basicStep{name: name, fn: fn},
@@ -42,6 +47,8 @@ func (t *Transaction) RepeatingStep(name string, fn interface{}, repeat int, int
 	t.steps = append(t.steps, step)
 }
 
+// Builds the executable queue with validation of steps inside
+// shouldn't be called very rapidly
 func (t Transaction) Build() (Executable, error) {
 	for _, step := range t.steps {
 		if err := step.validate(); err != nil {
