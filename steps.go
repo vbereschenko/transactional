@@ -16,13 +16,12 @@ type step interface {
 	getName() string
 	call(values []reflect.Value) ([]reflect.Value, error)
 	validate() error
-	// @TODO step should validate himself
 }
 
 type basicStep struct {
-	name string
-	fn interface{}
-	hasError bool
+	name          string
+	fn            interface{}
+	hasError      bool
 	errorPosition int
 }
 
@@ -31,6 +30,7 @@ func (s basicStep) getName() string {
 }
 
 func (s basicStep) call(values []reflect.Value) ([]reflect.Value, error) {
+	log.Printf("step [%s] calling", s.name)
 	inputValues := reflect.ValueOf(s.fn).Call(values)
 
 	if s.hasError && !inputValues[s.errorPosition].IsNil() {
@@ -63,12 +63,12 @@ func (s fallbackStep) validate() error {
 	}
 	rFn := reflect.TypeOf(s.fn)
 
-	if rFn.NumIn() != rFallback.NumIn() - hasError {
+	if rFn.NumIn() != rFallback.NumIn()-hasError {
 		return fmt.Errorf("step [%s] number of arguments don't match in fn and fallback", s.name)
 	}
 
 	for i := 0; i < rFn.NumIn(); i++ {
-		if rFn.In(i) != rFallback.In(i + hasError) {
+		if rFn.In(i) != rFallback.In(i+hasError) {
 			return errors.New("types don't match")
 		}
 	}
@@ -79,7 +79,7 @@ func (s fallbackStep) validate() error {
 type repeatingStep struct {
 	basicStep
 	interval time.Duration
-	repeat int
+	repeat   int
 }
 
 func (s repeatingStep) call(values []reflect.Value) ([]reflect.Value, error) {
@@ -89,7 +89,7 @@ func (s repeatingStep) call(values []reflect.Value) ([]reflect.Value, error) {
 		results, err = s.basicStep.call(values)
 		if err != nil {
 			log.Printf("step [%s] repeating %d of %d, cause %e", s.name, i, s.repeat, err)
-			<- time.After(s.interval)
+			<-time.After(s.interval)
 			continue
 		} else {
 			return results, nil

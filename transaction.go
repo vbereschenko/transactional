@@ -6,6 +6,7 @@ import (
 )
 
 type Transaction struct {
+	Name  string
 	steps []step
 }
 
@@ -33,28 +34,30 @@ func (t *Transaction) FallbackStep(name string, fn, fallback interface{}) *Trans
 func (t *Transaction) RepeatingStep(name string, fn interface{}, repeat int, interval time.Duration) {
 	step := repeatingStep{
 		basicStep: basicStep{name: name, fn: fn},
-		repeat: repeat,
-		interval: interval,
+		repeat:    repeat,
+		interval:  interval,
 	}
 	step.hasError, step.errorPosition = errorPosition(fn)
 
 	t.steps = append(t.steps, step)
 }
 
-func (t Transaction) Build() (Executable, error) { // @TODO need to validate everything
+func (t Transaction) Build() (Executable, error) {
 	for _, step := range t.steps {
 		if err := step.validate(); err != nil {
-			return Executable{}, err
+			return nil, err
 		}
 	}
 
-	return Executable{t.steps, make([][]reflect.Value, len(t.steps))}, nil
+	return &chainExecutable{t.Name, t.steps}, nil
 }
-
 
 func errorPosition(step interface{}) (bool, int) {
 	stepType := reflect.TypeOf(step)
-	lastType := stepType.Out(stepType.NumOut()-1)
+	if stepType.NumOut() == 0 {
+		return false, 0
+	}
+	lastType := stepType.Out(stepType.NumOut() - 1)
 
-	return lastType.Implements(errInterface), stepType.NumOut()-1
+	return lastType.Implements(errInterface), stepType.NumOut() - 1
 }

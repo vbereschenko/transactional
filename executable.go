@@ -6,21 +6,33 @@ import (
 	"time"
 )
 
-func (t Executable) Execute(input ...interface{}) error {
+// executable transaction interface
+type Executable interface {
+	// to run transaction, first function will receive arguments provided to this func
+	Execute(input ...interface{}) error
+}
+
+type chainExecutable struct {
+	name  string
+	steps []step
+}
+
+func (t chainExecutable) Execute(input ...interface{}) error {
 	inputValues := make([]reflect.Value, len(input))
 	for i, inputValue := range input {
 		inputValues[i] = reflect.ValueOf(inputValue)
 	}
 	var executionStart time.Time
 	var err error
+	var values = make([][]reflect.Value, len(t.steps))
 	for position, step := range t.steps {
-		t.values[position] = inputValues
+		values[position] = inputValues
 		executionStart = time.Now()
 		inputValues, err = step.call(inputValues)
-		log.Printf("step [%s] time %v", step.getName(), time.Since(executionStart))
+		log.Printf("[%s] step [%s] time %v", t.name, step.getName(), time.Since(executionStart))
 		if err != nil {
-			log.Printf("fallbackStep [%s] failed", step.getName())
-			t.fallback(reflect.ValueOf(err), position)
+			log.Printf("[%s] step [%s] failed, trying to rollback changes", t.name, step.getName())
+			t.fallback(values, reflect.ValueOf(err), position)
 
 			return err
 		}
@@ -29,16 +41,11 @@ func (t Executable) Execute(input ...interface{}) error {
 	return nil
 }
 
-func (t Executable) fallback(err reflect.Value, position int) {
-	for i:=position; i>=0; i-- {
-		if fallbackStep, correct := t.steps[i].(fallbackStep); correct {
-			log.Printf("fallbackStep [%s] rolled back", t.steps[i].getName())
-			reflect.ValueOf(fallbackStep.fallback).Call(append(append([]reflect.Value{err}, t.values[i]...)))
+func (t chainExecutable) fallback(values [][]reflect.Value, err reflect.Value, position int) {
+	for i := position; i >= 0; i-- {
+		if fallbackStep, correct := t.steps[i].(*fallbackStep); correct {
+			log.Printf("[%s] fallbackStep [%s] rolled back", t.name, t.steps[i].getName())
+			reflect.ValueOf(fallbackStep.fallback).Call(append(append([]reflect.Value{err}, values[i]...)))
 		}
 	}
-}
-
-type Executable struct {
-	steps []step
-	values [][]reflect.Value
 }
