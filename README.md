@@ -1,4 +1,4 @@
-# Transactional actions [![Build Status](https://travis-ci.org/vbereschenko/transactional.svg?branch=master)](https://travis-ci.org/vbereschenko/transactional) [![Go Report Card](https://goreportcard.com/badge/github.com/vbereschenko/transactional)](https://goreportcard.com/report/github.com/vbereschenko/transactional)
+# Transactional actions [![Build Status](https://travis-ci.org/vbereschenko/transactional.svg?branch=master)](https://travis-ci.org/vbereschenko/transactional) [![Go Report Card](https://goreportcard.com/badge/github.com/vbereschenko/transactional)](https://goreportcard.com/report/github.com/vbereschenko/transactional) [![codecov](https://codecov.io/gh/vbereschenko/transactional/branch/master/graph/badge.svg)](https://codecov.io/gh/vbereschenko/transactional)
 
 ### Example of code
 
@@ -22,7 +22,7 @@ func main() {
 }
 
 func queueHandler() transactional.Transaction {
-	orderReadTransaction := transactional.Transaction{Name: "queue"}
+	orderReadTransaction := transactional.Transaction{Config: transactional.Configuration{Name: "transaction"}}
 	type Data struct {
 		Id string
 	}
