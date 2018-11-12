@@ -2,8 +2,13 @@ package transactional
 
 import (
 	"log"
+	"os"
 	"reflect"
 	"time"
+)
+
+var (
+	defaultLog = log.New(os.Stdout, "[transaction] ", log.LstdFlags)
 )
 
 // executable transaction interface
@@ -13,8 +18,9 @@ type Executable interface {
 }
 
 type chainExecutable struct {
-	name  string
-	steps []step
+	name   string
+	steps  []step
+	logger Logger
 }
 
 // Execute default chain
@@ -29,10 +35,11 @@ func (t chainExecutable) Execute(input ...interface{}) error {
 	for position, step := range t.steps {
 		values[position] = inputValues
 		executionStart = time.Now()
+		log.Printf("[%s] -> [%s] calling", t.name, step.getName())
 		inputValues, err = step.call(inputValues)
-		log.Printf("[%s] step [%s] time %v", t.name, step.getName(), time.Since(executionStart))
+		log.Printf("[%s] -> [%s] time %v", t.name, step.getName(), time.Since(executionStart))
 		if err != nil {
-			log.Printf("[%s] step [%s] failed, trying to rollback changes", t.name, step.getName())
+			log.Printf("[%s] -> [%s] failed, trying to rollback changes", t.name, step.getName())
 			t.fallback(values, reflect.ValueOf(err), position)
 
 			return err
@@ -45,8 +52,22 @@ func (t chainExecutable) Execute(input ...interface{}) error {
 func (t chainExecutable) fallback(values [][]reflect.Value, err reflect.Value, position int) {
 	for i := position; i >= 0; i-- {
 		if fallbackStep, correct := t.steps[i].(*fallbackStep); correct {
-			log.Printf("[%s] fallbackStep [%s] rolled back", t.name, t.steps[i].getName())
+			log.Printf("[%s] -> [%s] rolled back", t.name, t.steps[i].getName())
 			reflect.ValueOf(fallbackStep.fallback).Call(append(append([]reflect.Value{err}, values[i]...)))
 		}
 	}
+}
+
+func (t *chainExecutable) apply(config Configuration) *chainExecutable {
+	t.logger = config.Logger
+	if t.logger == nil {
+		t.logger = defaultLog
+	}
+
+	t.name = config.Name
+	if t.name == "" {
+		t.name = "transaction"
+	}
+
+	return t
 }

@@ -2,7 +2,6 @@ package transactional
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"reflect"
 	"time"
@@ -10,6 +9,12 @@ import (
 
 var (
 	errInterface = reflect.TypeOf((*error)(nil)).Elem()
+	failedStep   = errors.New("step failed")
+
+	errorHandlerRequired = errors.New("error handler is required")
+	invalidFirstArg      = errors.New("handling function returns error, so it should be handled")
+	invalidStepFallback  = errors.New("step number of arguments don't match in fn and fallback")
+	typesMismatch        = errors.New("types don't match")
 )
 
 type step interface {
@@ -29,8 +34,16 @@ func (s basicStep) getName() string {
 	return s.name
 }
 
-func (s basicStep) call(values []reflect.Value) ([]reflect.Value, error) {
-	log.Printf("step [%s] calling", s.name)
+func (s basicStep) call(values []reflect.Value) (returnValues []reflect.Value, err error) {
+	defer func() {
+		if cause := recover(); cause != nil {
+			if causeErr, is := cause.(error); is {
+				err = causeErr
+			} else {
+				err = failedStep
+			}
+		}
+	}()
 	inputValues := reflect.ValueOf(s.fn).Call(values)
 
 	if s.hasError && !inputValues[s.errorPosition].IsNil() {
@@ -53,23 +66,22 @@ type fallbackStep struct {
 }
 
 func (s fallbackStep) validate() error {
-	hasError := 0
 	rFallback := reflect.TypeOf(s.fallback)
-	if s.hasError {
-		if !rFallback.In(0).Implements(errInterface) {
-			return errors.New("handling function returns error, so it should be handled")
-		}
-		hasError++
+	if rFallback.NumIn() == 0 {
+		return errorHandlerRequired
+	}
+	if !rFallback.In(0).Implements(errInterface) {
+		return invalidFirstArg
 	}
 	rFn := reflect.TypeOf(s.fn)
 
-	if rFn.NumIn() != rFallback.NumIn()-hasError {
-		return fmt.Errorf("step [%s] number of arguments don't match in fn and fallback", s.name)
+	if rFn.NumIn() != (rFallback.NumIn() - 1) {
+		return invalidStepFallback
 	}
 
 	for i := 0; i < rFn.NumIn(); i++ {
-		if rFn.In(i) != rFallback.In(i+hasError) {
-			return errors.New("types don't match")
+		if rFn.In(i) != rFallback.In(i+1) {
+			return typesMismatch
 		}
 	}
 
@@ -88,7 +100,7 @@ func (s repeatingStep) call(values []reflect.Value) ([]reflect.Value, error) {
 	for i := 1; i <= s.repeat; i++ {
 		results, err = s.basicStep.call(values)
 		if err != nil {
-			log.Printf("step [%s] repeating %d of %d, cause %e", s.name, i, s.repeat, err)
+			log.Printf("step [%s] try %d of %d, cause %e", s.name, i, s.repeat, err)
 			<-time.After(s.interval)
 			continue
 		} else {
@@ -98,4 +110,16 @@ func (s repeatingStep) call(values []reflect.Value) ([]reflect.Value, error) {
 	}
 
 	return nil, err
+}
+
+func (s repeatingStep) validate() error {
+	if err := s.basicStep.validate(); err != nil {
+		return err
+	}
+
+	if !s.hasError {
+		return invalidFirstArg
+	}
+
+	return nil
 }

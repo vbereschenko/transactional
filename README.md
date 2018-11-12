@@ -46,3 +46,12 @@ func queueHandler() transactional.Transaction {
 }
 
 ```
+
+#### Output will be following
+```
+2018/11/08 19:45:57 step [read] calling
+2018/11/08 19:45:57 [queue] step [read] time 181.626µs
+2018/11/08 19:45:57 step [handle] calling
+2018/11/08 19:45:57 [queue] step [handle] time 13.313µs
+2018/11/08 19:45:57 err: <nil>
+```

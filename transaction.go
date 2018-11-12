@@ -1,12 +1,14 @@
 package transactional
 
 import (
+	"fmt"
 	"reflect"
 	"time"
 )
 
 type Transaction struct {
-	Name  string
+	Config Configuration
+
 	steps []step
 }
 
@@ -52,11 +54,12 @@ func (t *Transaction) RepeatingStep(name string, fn interface{}, repeat int, int
 func (t Transaction) Build() (Executable, error) {
 	for _, step := range t.steps {
 		if err := step.validate(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("step [%s] validation failed: %e", step.getName(), err)
 		}
 	}
+	exec := &chainExecutable{steps: t.steps}
 
-	return &chainExecutable{t.Name, t.steps}, nil
+	return exec.apply(t.Config), nil
 }
 
 func errorPosition(step interface{}) (bool, int) {
