@@ -51,7 +51,7 @@ func (t chainExecutable) Execute(input ...interface{}) error {
 
 func (t chainExecutable) fallback(values [][]reflect.Value, err reflect.Value, position int) {
 	for i := position; i >= 0; i-- {
-		if fallbackStep, correct := t.steps[i].(*fallbackStep); correct {
+		if fallbackStep, correct := t.steps[i].(fallbackStep); correct {
 			log.Printf("[%s] -> [%s] rolled back", t.name, t.steps[i].getName())
 			reflect.ValueOf(fallbackStep.fallback).Call(append(append([]reflect.Value{err}, values[i]...)))
 		}
