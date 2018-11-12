@@ -39,7 +39,7 @@ func (t chainExecutable) Execute(input ...interface{}) error {
 		inputValues, err = step.call(inputValues)
 		log.Printf("[%s] -> [%s] time %v", t.name, step.getName(), time.Since(executionStart))
 		if err != nil {
-			log.Printf("[%s] -> [%s] failed, trying to rollback changes", t.name, step.getName())
+			log.Printf("[%s] -> [%s] failed, trying to rollback changes: %e", t.name, step.getName(), err)
 			t.fallback(values, reflect.ValueOf(err), position)
 
 			return err
